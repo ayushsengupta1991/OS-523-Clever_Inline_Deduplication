@@ -15,5 +15,5 @@ EXECUTABLES :=
 SUBDIRS := \
 src \
 fs/src \
-. \
+cac \
 

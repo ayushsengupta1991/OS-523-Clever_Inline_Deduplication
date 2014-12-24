@@ -10,7 +10,7 @@
 
 #include <fs.h>
 
-static const char * FS_NAME = "FS";
+static const char * FS_NAME = "../FS4";
 
 /* fs.c */
 int alloc_block(int *addr);
@@ -23,7 +23,7 @@ void initialize_superblock(void);
 int file_get_block(struct File *f, uint32_t file_blockno, int *pblk);
 //int	file_create(const char *path, struct File **f);
 //int	file_open(const char *path, struct File **f);
-ssize_t	file_data_read(struct File *f, char *buf, int block_no);
+int	file_data_read(struct File *f, char *buf, int block_no);
 
 int	file_data_write(struct File *f, char *buf, size_t count, int block_no);
 int	file_meta_data_write(struct File *f);

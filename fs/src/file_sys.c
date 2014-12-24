@@ -2,7 +2,7 @@
  * fs.c
  *
  *  Created on: Nov 27, 2014
- *      Author: ayush
+ *      Author: manoj
  */
 
 #include <file_sys.h>
@@ -29,7 +29,6 @@ void fs_init(void)
 	 printf("\n FS is initialized\n");
 
  initialize_superblock();
- //fclose(fp);
  memset(block_entries, 0, ENTRY);
 
 }
@@ -48,8 +47,10 @@ void initialize_superblock(void)
 	 printf("First time here");
 	 SuperBlockTail_Update(SuperBlockAddr_start);
    }
-   fseek(fp,datablock_tail_addr,SEEK_SET);
-   fread(&block_tail,sizeof(int),1,fp);
+
+   //Datablock TAIL INITIALIZE
+    fseek(fp,datablock_tail_addr,SEEK_SET);
+    fread(&block_tail,sizeof(int),1,fp);
 
    if(block_tail == 0)
    {
@@ -57,6 +58,7 @@ void initialize_superblock(void)
 	 DataBlockTail_Update(DataBlock_Start);
    }
 
+   // Superblock number of block written initialize
    fseek(fp,superblock_total_blocks,SEEK_SET);
    fread(&sb_tblocks,sizeof(int),1,fp);
 
@@ -170,7 +172,7 @@ int	file_data_write(struct File *f, char *buf, size_t count, int block_no)
 	int addr;
 	int hash_second_table_addr;
 	int second_table_offset;
-
+	int flag = 0;
 	uint32_t hash = generate_hash(buf, BLKSIZE);
 
     int hash_first_table_addr = HashBlock_Start + (hash & HashLowBits);
@@ -178,32 +180,30 @@ int	file_data_write(struct File *f, char *buf, size_t count, int block_no)
     fseek(fp,hash_first_table_addr,SEEK_SET);
     fread(&addr, sizeof(int), 1, fp);
 
-
     if(addr == 0)
     {
-    	fseek(fp,hash_first_table_addr,SEEK_SET);
 
     	if(alloc_block(&hash_addr) < 0)
     	{
         	printf("\n error in block allocation for write");
         	return -1;
     	}
+    	fseek(fp,hash_first_table_addr,SEEK_SET);
     	fwrite(&hash_addr, sizeof(int), 1, fp);
     	flush_block(hash_addr);
 
-    	printf("hash addr %x", hash_addr);
     	if((err = file_get_block(f, block_no, &pblk)) < 0)
     	{
     		printf("\n error in getting block for write");
     		return -1;
     	}
-
+    	flush_block(pblk);
     	fseek(fp,pblk,SEEK_SET);
     	fwrite(buf, count, 1, fp);
 
     	f->f_size += count;
     	f->f_written += count;
-
+    	f->n_blocks += 1;
     	super->total_blocks+=1;
     	super->written_blocks+=1;
 
@@ -217,39 +217,33 @@ int	file_data_write(struct File *f, char *buf, size_t count, int block_no)
     else
     {
     	int blk_addr;
-    	//printf("hash addr %x", addr);
     	second_table_offset = (hash & HashHighBits) >> 25;
     	hash_second_table_addr = (int)((int *)addr + second_table_offset);
     	fseek(fp,hash_second_table_addr,SEEK_SET);
     	fread(&blk_addr, sizeof(int), 1, fp);
 
-    	if(blk_addr != 0)
+    	if(blk_addr != 0 && blk_addr < super->tail_db)
     	{
-
-
     	   write_deduplicate_block_addr(f, block_no, blk_addr);
     	   f->f_size += count;
-
+    	   f->n_blocks += 1;
     	   super->total_blocks+=1;
-    	   //super->written_blocks+=1;
-
-    	   printf("\n block_no %d deduplicated ", block_no);
+    	   flag = 1;
 
     	}
     	else
     	{
-    		printf("hash addr %x", hash_addr);
 			if((err = file_get_block(f, block_no, &pblk)) < 0)
 			{
 				printf("\n error in getting block for write");
 				return -1;
 			}
-
+			flush_block(pblk);
 			fseek(fp,pblk,SEEK_SET);
 			fwrite(buf, count, 1, fp);
 			f->f_size += count;
 			f->f_written += count;
-
+			f->n_blocks += 1;
 			super->total_blocks  += 1;
 			super->written_blocks += 1;
 
@@ -259,8 +253,9 @@ int	file_data_write(struct File *f, char *buf, size_t count, int block_no)
     	}
 
 
-}
-return 0;
+    }
+
+	return flag;
 }
 
 int file_stat(char * key, struct File *f)
@@ -269,7 +264,6 @@ int file_stat(char * key, struct File *f)
 	int i, addr = sizeof(struct SuperBlock);
     int n_files = (super->tail_sb - sizeof(struct SuperBlock))/sizeof(struct File);
 
-    //printf("\n n_files %d", n_files);
     for(i = 0; i < n_files; i ++)
     {
     	fread(f, sizeof(struct File), 1, fp);
@@ -277,37 +271,41 @@ int file_stat(char * key, struct File *f)
     		break;
     }
     if(i == n_files)
-    	printf("File not Found");
+    {
+    	return -1;
+    }
 	return 0;
 }
 
-ssize_t	file_data_read(struct File *f, char *buf, int block_no)
+int	file_data_read(struct File *f, char *buf, int block_no)
 {
-   ssize_t n;
-   int MaxPos;
-   if(block_no > (f->f_size/BLKSIZE))
-	  return -1;
+   	   int n,i;
+	   int MaxPos;
+	   if(block_no >= (f->n_blocks))
+		  return -1;
 
-   int f_direct_no = block_no/ENTRY;
-   int offset = block_no%ENTRY;
-   uint32_t *base_addr = (uint32_t *)f->f_direct[f_direct_no];
-   uint32_t addr = (uint32_t)(base_addr + offset);
-   int val;
+	   int f_direct_no = block_no/ENTRY;
+	   int offset = block_no%ENTRY;
+	   uint32_t *base_addr = (uint32_t *)f->f_direct[f_direct_no];
+	   uint32_t addr = (uint32_t)(base_addr + offset);
+	   int val;
 
-   fseek(fp,addr,SEEK_SET);
-   fread(&val, sizeof(int), 1, fp);
-   fseek(fp,val,SEEK_SET);
-   MaxPos = (block_no + 1) * BLKSIZE;
+	   fseek(fp,addr,SEEK_SET);
+	   fread(&val, sizeof(int), 1, fp);
+	   fseek(fp,val,SEEK_SET);
 
-   if(MaxPos > f->f_size)
-	   n = f->f_size - (block_no) * BLKSIZE;
-   else
-	   n = BLKSIZE;
+	   for(i = 0; i < BLKSIZE; i++)
+	   {
+		   char val1;
+		   fread(&val1, sizeof(char), 1, fp);
+		   if(!(val1 == 'A' || val1 == 'G' || val1 == 'C' || val1 == 'T'))
+		   //if(!val1)
+			   break;
+		   else
+			   buf[i] = val1;
+	   }
 
-   n = fread(buf, sizeof(char), n, fp);
-
-   //printf("\n block_no %d addr %x", block_no, val);
-   return n;
+	   return i;
 
 }
 
@@ -370,7 +368,7 @@ void fs_sync(void)
 void flush_block(int addr)
 {
 	char * buf[BLKSIZE];
-	memset(buf, 0, BLKSIZE);
+	memset(buf, '\0', BLKSIZE);
 	fseek(fp,addr,SEEK_SET);
 	fwrite(buf, sizeof(char), BLKSIZE, fp);
 }
@@ -407,9 +405,3 @@ float deduplication_ratio()
 {
   return (super->total_blocks/(1.0*super->written_blocks));
 }
-
-/*float file_deduplication_ratio(struct File *f)
-{
-  return (f->f_size/(1.0*f->f_written));
-}
-*/

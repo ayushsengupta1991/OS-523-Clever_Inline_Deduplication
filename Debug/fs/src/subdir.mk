@@ -20,7 +20,7 @@ C_DEPS += \
 fs/src/%.o: ../fs/src/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -I"/home/ayush/workspace/dedup/fs/inc" -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	gcc -I"/home/rishoo/workspace/dedup4/fs/inc" -I"/home/rishoo/workspace/dedup4/inc" -I"/home/rishoo/workspace/dedup4/cac" -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

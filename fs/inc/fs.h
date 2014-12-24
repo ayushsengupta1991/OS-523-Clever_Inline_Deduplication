@@ -10,7 +10,7 @@
 
 #include <stdio.h>
 
-typedef unsigned long long uint64_t;
+//typedef unsigned long long uint64_t;
 typedef unsigned int uint32_t;
 //const char * fs_name = "FS";
 #define BLKSIZE		512
@@ -20,7 +20,7 @@ typedef unsigned int uint32_t;
 #define MAXNAMELEN	16
 
 // Number of block pointers in a File descriptor
-#define NDIRECT		20
+#define NDIRECT	 84 // 84*128*512 ~5.25MB
 #define SuperBlockAddr_start 0x10
 
 //Assuming my file system can store 500 files so we have to store
@@ -54,9 +54,10 @@ struct File {
 
 	// Direct blocks each block is of 512 bytes and 512/4 ~= 128 entries
 	//  total 20 of these blocks so total file size 20*128*512 ~ 1.25 MB file
-	uint32_t f_direct[20];
+	uint32_t f_direct[NDIRECT];   // 32+32+20
 	uint32_t f_written;
-	uint32_t pad[6];
+	uint32_t n_blocks;
+	uint32_t pad[5];
 };
 
 struct SuperBlock {

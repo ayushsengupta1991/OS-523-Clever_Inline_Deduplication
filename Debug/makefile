@@ -10,6 +10,7 @@ RM := rm -rf
 -include sources.mk
 -include src/subdir.mk
 -include fs/src/subdir.mk
+-include cac/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -24,19 +25,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: dedup
+all: dedup4
 
 # Tool invocations
-dedup: $(OBJS) $(USER_OBJS)
+dedup4: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc  -o "dedup" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc  -o "dedup4" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(OBJS)$(C_DEPS)$(EXECUTABLES) dedup
+	-$(RM) $(OBJS)$(C_DEPS)$(EXECUTABLES) dedup4
 	-@echo ' '
 
 .PHONY: all clean dependents
